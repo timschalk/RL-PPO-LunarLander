@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import sys
+import getopt
 import gym
 import numpy as np
 import torch
@@ -25,11 +27,12 @@ def main(
     log_dir="../logs",
     learning_rate=0.001,
     state_scale=1.0,
+    render_human=False
 ):
     writer = SummaryWriter(log_dir=log_dir, filename_suffix=env_name, comment=env_name)
 
-    env = gym.make(env_name)
-    observation = env.reset()
+    env = gym.make(env_name, render_mode=("human" if render_human else None))
+    observation, info = env.reset()
 
     n_actions = env.action_space.n
     feature_dim = observation.size
@@ -47,7 +50,7 @@ def main(
 
     batch_size = 32
 
-    max_iterations = 200
+    max_iterations = 50 # 200
 
     history = History()
 
@@ -68,7 +71,7 @@ def main(
 
         for episode_i in range(max_episodes):
 
-            observation = env.reset()
+            observation, info = env.reset()
             episode = Episode()
 
             for timestep in range(max_timesteps):
@@ -78,7 +81,8 @@ def main(
                 )
                 value = value_model.state_value(observation / state_scale)
 
-                new_observation, reward, done, info = env.step(action)
+                new_observation, reward, done, truncated, info = env.step(action)
+                #env.render()
 
                 episode.append(
                     observation=observation / state_scale,
@@ -92,6 +96,7 @@ def main(
                 observation = new_observation
 
                 if done:
+                    #env.render()
                     episode.end_episode(last_value=0)
                     break
 
@@ -133,12 +138,19 @@ def main(
 
 
 if __name__ == "__main__":
+    renderHuman = False
 
+    argv = sys.argv[1:]
+    opts, args = getopt.getopt(argv, "r", ["renderHuman"])
+    for opt, arg in opts:
+        if opt in ("-r", "--renderHuman"):
+            renderHuman = True
     main(
         reward_scale=20.0,
         clip=0.2,
         env_name="LunarLander-v2",
         learning_rate=0.001,
         state_scale=1.0,
-        log_dir="logs/Lunar"
+        log_dir="logs/Lunar",
+        render_human=renderHuman
     )
